@@ -1,0 +1,28 @@
+{
+  "name": "gen-dts",
+  "version": "1.0.0",
+  "description": "generate .d.ts bundle.",
+  "main": "build/gen-dts.js",
+  "types": "build/gen-dts.d.ts",
+  "scripts": {
+    "build": "tsc -v & tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "bundle",
+    "declaration",
+    "dts"
+  ],
+  "author": "Lee",
+  "license": "ISC",
+  "dependencies": {
+    "fs-extra": "^7.0.1",
+    "tfig": "file:./tfig-3.2.4.tgz",
+    "typescript": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^9.0.13",
+    "typescript": "^4.5.5",
+    "@types/node": "^12.0.0"
+  }
+}
