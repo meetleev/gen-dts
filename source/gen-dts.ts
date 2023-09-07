@@ -1,7 +1,7 @@
-import * as fs from 'fs-extra';
+import {readdir, ensureDirSync, copyFileSync, unlinkSync, existsSync, writeFile, outputFile, unlink} from 'fs-extra';
 import ts from 'typescript';
-import * as gift from 'tfig';
-import * as ps from 'path';
+import {bundle} from 'tfig';
+import {basename, dirname, extname, isAbsolute, join} from 'path';
 
 export interface IOptions {
     rootDir: string;
@@ -10,16 +10,16 @@ export interface IOptions {
     nonExportedThirdLibs?: string[];
 }
 
-async function getSourceEntries(engine:string) {
-    const result: Record<string, string> = { };
-    const entryRootDir = ps.join(engine, 'exports');
-    const entryFileNames = await fs.readdir(entryRootDir);
+async function getSourceEntries(engine: string) {
+    const result: Record<string, string> = {};
+    const entryRootDir = join(engine, 'exports');
+    const entryFileNames = await readdir(entryRootDir);
     for (const entryFileName of entryFileNames) {
-        const entryExtName = ps.extname(entryFileName);
+        const entryExtName = extname(entryFileName);
         if (!entryExtName.toLowerCase().endsWith('.ts')) {
             continue;
         }
-        const entryBaseNameNoExt = ps.basename(entryFileName, entryExtName);
+        const entryBaseNameNoExt = basename(entryFileName, entryExtName);
         const entryName = `ccx.${entryBaseNameNoExt}`;
         result[entryName] = `exports/${entryBaseNameNoExt}`;
     }
@@ -30,11 +30,11 @@ export async function generate(options: IOptions) {
     console.log(`Typescript version: ${ts.version}`);
 
     const {rootDir, outDir, rootModuleName, nonExportedThirdLibs} = options;
-    fs.ensureDirSync(outDir);
+    ensureDirSync(outDir);
 
-    const tsConfigPath = ps.join(rootDir, 'tsconfig.json');
+    const tsConfigPath = join(rootDir, 'tsconfig.json');
 
-    const unbundledOutFile = ps.join(outDir, `before-rollup.js`);
+    const unbundledOutFile = join(outDir, `before-rollup.js`);
     const parsedCommandLine = ts.getParsedCommandLineOfConfigFile(
         tsConfigPath, {
             declaration: true,
@@ -54,25 +54,25 @@ export async function generate(options: IOptions) {
     );
 
     // console.log('parsedCommandLine', parsedCommandLine);
-    const outputJSPath = ps.join(ps.dirname(tsConfigPath), unbundledOutFile);
+    const outputJSPath = join(dirname(tsConfigPath), unbundledOutFile);
     // console.log('outputJSPath', outputJSPath);
 
-    const extName = ps.extname(outputJSPath);
+    const extName = extname(outputJSPath);
     if (extName !== '.js') {
         console.error(`Unexpected output extension ${extName}, please check it.`);
         return undefined;
     }
-    const dirName = ps.dirname(outputJSPath);
-    const baseName = ps.basename(outputJSPath, extName);
+    const dirName = dirname(outputJSPath);
+    const baseName = basename(outputJSPath, extName);
     const destExtensions = [
         '.d.ts',
         '.d.ts.map',
     ];
     for (const destExtension of destExtensions) {
-        const destFile = ps.join(dirName, baseName + destExtension);
-        if (fs.existsSync(destFile)) {
+        const destFile = join(dirName, baseName + destExtension);
+        if (existsSync(destFile)) {
             console.log(`Delete old ${destFile}.`);
-            fs.unlinkSync(destFile);
+            unlinkSync(destFile);
         }
     }
 
@@ -116,38 +116,38 @@ export async function generate(options: IOptions) {
         }
     }
 
-    const tscOutputDtsFile = ps.join(dirName, baseName + '.d.ts');
+    const tscOutputDtsFile = join(dirName, baseName + '.d.ts');
     // console.log('tscOutputDtsFile', tscOutputDtsFile)
-    if (!fs.existsSync(tscOutputDtsFile)) {
+    if (!existsSync(tscOutputDtsFile)) {
         console.error(`Failed to compile.`);
         return false;
     }
 
-    const types = parsedCommandLine.options?.types?.map((typeFile) => `${typeFile}.d.ts`);
+    const types = (parsedCommandLine.options?.types ?? []).map((typeFile) => `${typeFile}.d.ts`);
     console.log('types', types);
     types?.forEach((file) => {
-        const destPath = ps.join(outDir, ps.isAbsolute(file) ? ps.basename(file) : file);
-        fs.ensureDirSync(ps.dirname(destPath));
-        fs.copyFileSync(file, destPath);
+        const destPath = join(outDir, isAbsolute(file) ? basename(file) : file);
+        ensureDirSync(dirname(destPath));
+        copyFileSync(file, destPath);
     });
 
     const entryMap = await getSourceEntries(rootDir);
     console.log('entryMap', entryMap);
     const entries = Object.keys(entryMap);
 
-    const dtsFile = ps.join(dirName, 'virtual-dts.d.ts');
+    const dtsFile = join(dirName, 'virtual-dts.d.ts');
     await (async () => {
         const ccModules = entries.slice().map((extern) => entryMap[extern]);
         const code = `declare module 'ccx' {\n${ccModules.map((moduleId) => `    export * from "${moduleId}";`).join('\n')}\n}`;
-        await fs.writeFile(dtsFile, code, {encoding: 'utf8'});
+        await writeFile(dtsFile, code, {encoding: 'utf8'});
     })();
 
     console.log(`Bundling...`);
     let cleanupFiles = [tscOutputDtsFile, dtsFile];
     try {
         const giftInputPath = tscOutputDtsFile;
-        const giftOutputPath = ps.join(dirName, `${rootModuleName}.d.ts`);
-        const giftResult = gift.bundle({
+        const giftOutputPath = join(dirName, `${rootModuleName}.d.ts`);
+        const giftResult = bundle({
             input: [giftInputPath, dtsFile],
             /*name: 'cc',
             rootModule: 'index',*/
@@ -161,13 +161,13 @@ export async function generate(options: IOptions) {
         });
         await Promise.all(giftResult.groups.map(async (group) => {
             let code = group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1${rootModuleName}$3`);
-            await fs.outputFile(group.path, code, {encoding: 'utf8'});
+            await outputFile(group.path, code, {encoding: 'utf8'});
         }));
     } catch (error) {
         console.error(error);
         return false;
     } finally {
-        await Promise.all((cleanupFiles.map(async (file) => fs.unlink(file))));
+        await Promise.all((cleanupFiles.map(async (file) => unlink(file))));
     }
     return true;
 }

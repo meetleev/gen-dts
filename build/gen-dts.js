@@ -1,27 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -36,21 +13,21 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generate = void 0;
-const fs = __importStar(require("fs-extra"));
+const fs_extra_1 = require("fs-extra");
 const typescript_1 = __importDefault(require("typescript"));
-const gift = __importStar(require("tfig"));
-const ps = __importStar(require("path"));
+const tfig_1 = require("tfig");
+const path_1 = require("path");
 function getSourceEntries(engine) {
     return __awaiter(this, void 0, void 0, function* () {
         const result = {};
-        const entryRootDir = ps.join(engine, 'exports');
-        const entryFileNames = yield fs.readdir(entryRootDir);
+        const entryRootDir = (0, path_1.join)(engine, 'exports');
+        const entryFileNames = yield (0, fs_extra_1.readdir)(entryRootDir);
         for (const entryFileName of entryFileNames) {
-            const entryExtName = ps.extname(entryFileName);
+            const entryExtName = (0, path_1.extname)(entryFileName);
             if (!entryExtName.toLowerCase().endsWith('.ts')) {
                 continue;
             }
-            const entryBaseNameNoExt = ps.basename(entryFileName, entryExtName);
+            const entryBaseNameNoExt = (0, path_1.basename)(entryFileName, entryExtName);
             const entryName = `ccx.${entryBaseNameNoExt}`;
             result[entryName] = `exports/${entryBaseNameNoExt}`;
         }
@@ -62,9 +39,9 @@ function generate(options) {
     return __awaiter(this, void 0, void 0, function* () {
         console.log(`Typescript version: ${typescript_1.default.version}`);
         const { rootDir, outDir, rootModuleName, nonExportedThirdLibs } = options;
-        fs.ensureDirSync(outDir);
-        const tsConfigPath = ps.join(rootDir, 'tsconfig.json');
-        const unbundledOutFile = ps.join(outDir, `before-rollup.js`);
+        (0, fs_extra_1.ensureDirSync)(outDir);
+        const tsConfigPath = (0, path_1.join)(rootDir, 'tsconfig.json');
+        const unbundledOutFile = (0, path_1.join)(outDir, `before-rollup.js`);
         const parsedCommandLine = typescript_1.default.getParsedCommandLineOfConfigFile(tsConfigPath, {
             declaration: true,
             noEmit: false,
@@ -81,24 +58,24 @@ function generate(options) {
             readFile: typescript_1.default.sys.readFile,
         });
         // console.log('parsedCommandLine', parsedCommandLine);
-        const outputJSPath = ps.join(ps.dirname(tsConfigPath), unbundledOutFile);
+        const outputJSPath = (0, path_1.join)((0, path_1.dirname)(tsConfigPath), unbundledOutFile);
         // console.log('outputJSPath', outputJSPath);
-        const extName = ps.extname(outputJSPath);
+        const extName = (0, path_1.extname)(outputJSPath);
         if (extName !== '.js') {
             console.error(`Unexpected output extension ${extName}, please check it.`);
             return undefined;
         }
-        const dirName = ps.dirname(outputJSPath);
-        const baseName = ps.basename(outputJSPath, extName);
+        const dirName = (0, path_1.dirname)(outputJSPath);
+        const baseName = (0, path_1.basename)(outputJSPath, extName);
         const destExtensions = [
             '.d.ts',
             '.d.ts.map',
         ];
         for (const destExtension of destExtensions) {
-            const destFile = ps.join(dirName, baseName + destExtension);
-            if (fs.existsSync(destFile)) {
+            const destFile = (0, path_1.join)(dirName, baseName + destExtension);
+            if ((0, fs_extra_1.existsSync)(destFile)) {
                 console.log(`Delete old ${destFile}.`);
-                fs.unlinkSync(destFile);
+                (0, fs_extra_1.unlinkSync)(destFile);
             }
         }
         console.log(`Generating...`);
@@ -138,34 +115,34 @@ function generate(options) {
                 printer(`${typescript_1.default.flattenDiagnosticMessageText(diagnostic.messageText, "\n")}`);
             }
         }
-        const tscOutputDtsFile = ps.join(dirName, baseName + '.d.ts');
+        const tscOutputDtsFile = (0, path_1.join)(dirName, baseName + '.d.ts');
         // console.log('tscOutputDtsFile', tscOutputDtsFile)
-        if (!fs.existsSync(tscOutputDtsFile)) {
+        if (!(0, fs_extra_1.existsSync)(tscOutputDtsFile)) {
             console.error(`Failed to compile.`);
             return false;
         }
-        const types = (_b = (_a = parsedCommandLine.options) === null || _a === void 0 ? void 0 : _a.types) === null || _b === void 0 ? void 0 : _b.map((typeFile) => `${typeFile}.d.ts`);
+        const types = ((_b = (_a = parsedCommandLine.options) === null || _a === void 0 ? void 0 : _a.types) !== null && _b !== void 0 ? _b : []).map((typeFile) => `${typeFile}.d.ts`);
         console.log('types', types);
         types === null || types === void 0 ? void 0 : types.forEach((file) => {
-            const destPath = ps.join(outDir, ps.isAbsolute(file) ? ps.basename(file) : file);
-            fs.ensureDirSync(ps.dirname(destPath));
-            fs.copyFileSync(file, destPath);
+            const destPath = (0, path_1.join)(outDir, (0, path_1.isAbsolute)(file) ? (0, path_1.basename)(file) : file);
+            (0, fs_extra_1.ensureDirSync)((0, path_1.dirname)(destPath));
+            (0, fs_extra_1.copyFileSync)(file, destPath);
         });
         const entryMap = yield getSourceEntries(rootDir);
         console.log('entryMap', entryMap);
         const entries = Object.keys(entryMap);
-        const dtsFile = ps.join(dirName, 'virtual-dts.d.ts');
+        const dtsFile = (0, path_1.join)(dirName, 'virtual-dts.d.ts');
         yield (() => __awaiter(this, void 0, void 0, function* () {
             const ccModules = entries.slice().map((extern) => entryMap[extern]);
             const code = `declare module 'ccx' {\n${ccModules.map((moduleId) => `    export * from "${moduleId}";`).join('\n')}\n}`;
-            yield fs.writeFile(dtsFile, code, { encoding: 'utf8' });
+            yield (0, fs_extra_1.writeFile)(dtsFile, code, { encoding: 'utf8' });
         }))();
         console.log(`Bundling...`);
         let cleanupFiles = [tscOutputDtsFile, dtsFile];
         try {
             const giftInputPath = tscOutputDtsFile;
-            const giftOutputPath = ps.join(dirName, `${rootModuleName}.d.ts`);
-            const giftResult = gift.bundle({
+            const giftOutputPath = (0, path_1.join)(dirName, `${rootModuleName}.d.ts`);
+            const giftResult = (0, tfig_1.bundle)({
                 input: [giftInputPath, dtsFile],
                 /*name: 'cc',
                 rootModule: 'index',*/
@@ -179,7 +156,7 @@ function generate(options) {
             });
             yield Promise.all(giftResult.groups.map((group) => __awaiter(this, void 0, void 0, function* () {
                 let code = group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1${rootModuleName}$3`);
-                yield fs.outputFile(group.path, code, { encoding: 'utf8' });
+                yield (0, fs_extra_1.outputFile)(group.path, code, { encoding: 'utf8' });
             })));
         }
         catch (error) {
@@ -187,7 +164,7 @@ function generate(options) {
             return false;
         }
         finally {
-            yield Promise.all((cleanupFiles.map((file) => __awaiter(this, void 0, void 0, function* () { return fs.unlink(file); }))));
+            yield Promise.all((cleanupFiles.map((file) => __awaiter(this, void 0, void 0, function* () { return (0, fs_extra_1.unlink)(file); }))));
         }
         return true;
     });

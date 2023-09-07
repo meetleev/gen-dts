@@ -15,18 +15,17 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/GLeeWei/gift.git"
+    "url": "https://github.com/meetleev/tfig.git"
   },
   "author": "Lee",
   "license": "ISC",
   "dependencies": {
     "fs-extra": "^7.0.1",
-    "typescript": "^4.5.5",
-    "tfig": "git+https://github.com/GLeeWei/gift.git"
+    "typescript": "^4.9.5",
+    "tfig": "git+https://github.com/meetleev/tfig.git"
   },
   "devDependencies": {
     "@types/fs-extra": "^9.0.13",
-    "@types/node": "^12.0.0",
-    "typescript": "^4.5.5"
+    "@types/node": "^12.0.0"
   }
 }
