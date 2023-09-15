@@ -1,7 +1,22 @@
-export interface IOptions {
-    rootDir: string;
+export interface OutputOptions {
     outDir: string;
     rootModuleName: string;
-    nonExportedThirdLibs?: string[];
+    nonExportedSymbolDistribution?: Array<{
+        /**
+         * Regex to match the module name, where the symbol is originally declared.
+         */
+        sourceModule: RegExp;
+        /**
+         * Target module, should be in `entries`.
+         */
+        targetModule: string;
+    }>;
+    nonExportedExternalLibs?: string[];
+    usePathForRootModuleName?: boolean;
+    needCopyExternalTypes?: boolean;
 }
-export declare function generate(options: IOptions): Promise<boolean | void>;
+export interface InputOptions {
+    rootDir: string;
+    output: OutputOptions | OutputOptions[];
+}
+export declare function generate(options: InputOptions): Promise<void>;

@@ -1,13 +1,31 @@
-import {readdir, ensureDirSync, copyFileSync, unlinkSync, existsSync, writeFile, outputFile, unlink} from 'fs-extra';
+import {readdir, ensureDirSync, copyFileSync, unlinkSync, existsSync, writeFile, outputFile, emptyDirSync} from 'fs-extra';
 import ts from 'typescript';
 import {bundle} from 'tfig';
 import {basename, dirname, extname, isAbsolute, join} from 'path';
+import {lstatSync, rmdirSync} from 'fs';
 
-export interface IOptions {
-    rootDir: string;
+export interface OutputOptions {
     outDir: string;
     rootModuleName: string;
-    nonExportedThirdLibs?: string[];
+    nonExportedSymbolDistribution?: Array<{
+        /**
+         * Regex to match the module name, where the symbol is originally declared.
+         */
+        sourceModule: RegExp;
+
+        /**
+         * Target module, should be in `entries`.
+         */
+        targetModule: string;
+    }>;
+    nonExportedExternalLibs?: string[];
+    usePathForRootModuleName?: boolean;
+    needCopyExternalTypes?: boolean;
+}
+
+export interface InputOptions {
+    rootDir: string;
+    output: OutputOptions | OutputOptions[];
 }
 
 async function getSourceEntries(engine: string) {
@@ -26,14 +44,32 @@ async function getSourceEntries(engine: string) {
     return result;
 }
 
-export async function generate(options: IOptions) {
+export async function generate(options: InputOptions) {
     console.log(`Typescript version: ${ts.version}`);
+    const {
+        rootDir,
+        output
+    } = options;
+    if (Array.isArray(output)) {
+        for (let o of output)
+            await _generate(rootDir, o);
+    } else
+        await _generate(rootDir, output);
+}
 
-    const {rootDir, outDir, rootModuleName, nonExportedThirdLibs} = options;
+async function _generate(rootDir: string, output: OutputOptions) {
+    const {
+        outDir,
+        rootModuleName,
+        nonExportedExternalLibs,
+        usePathForRootModuleName,
+        nonExportedSymbolDistribution,
+        needCopyExternalTypes,
+    } = output;
+
     ensureDirSync(outDir);
 
     const tsConfigPath = join(rootDir, 'tsconfig.json');
-
     const unbundledOutFile = join(outDir, `before-rollup.js`);
     const parsedCommandLine = ts.getParsedCommandLineOfConfigFile(
         tsConfigPath, {
@@ -60,7 +96,7 @@ export async function generate(options: IOptions) {
     const extName = extname(outputJSPath);
     if (extName !== '.js') {
         console.error(`Unexpected output extension ${extName}, please check it.`);
-        return undefined;
+        return;
     }
     const dirName = dirname(outputJSPath);
     const baseName = basename(outputJSPath, extName);
@@ -120,14 +156,16 @@ export async function generate(options: IOptions) {
     // console.log('tscOutputDtsFile', tscOutputDtsFile)
     if (!existsSync(tscOutputDtsFile)) {
         console.error(`Failed to compile.`);
-        return false;
+        return;
     }
-
     const types = (parsedCommandLine.options?.types ?? []).map((typeFile) => `${typeFile}.d.ts`);
     console.log('types', types);
+    let cleanTypesPaths: string[] = [];
     types?.forEach((file) => {
         const destPath = join(outDir, isAbsolute(file) ? basename(file) : file);
-        ensureDirSync(dirname(destPath));
+        let dir = dirname(destPath);
+        cleanTypesPaths.push(dir);
+        ensureDirSync(dir);
         copyFileSync(file, destPath);
     });
 
@@ -144,30 +182,36 @@ export async function generate(options: IOptions) {
 
     console.log(`Bundling...`);
     let cleanupFiles = [tscOutputDtsFile, dtsFile];
+    if (!needCopyExternalTypes) cleanupFiles = cleanupFiles.concat(cleanTypesPaths);
     try {
         const giftInputPath = tscOutputDtsFile;
         const giftOutputPath = join(dirName, `${rootModuleName}.d.ts`);
         const giftResult = bundle({
             input: [giftInputPath, dtsFile],
-            /*name: 'cc',
-            rootModule: 'index',*/
             entries: {
-                'ccx': 'ccx',
+                ccx: 'ccx',
             },
             groups: [
                 {test: /^ccx.*$/, path: giftOutputPath},
             ],
-            nonExportedThirdLibs: nonExportedThirdLibs,
+            nonExportedExternalLibs: nonExportedExternalLibs,
+            nonExportedSymbolDistribution: nonExportedSymbolDistribution,
         });
         await Promise.all(giftResult.groups.map(async (group) => {
-            let code = group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1${rootModuleName}$3`);
+            let code = usePathForRootModuleName ? group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1'${rootModuleName}'$3`)
+                : group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1${rootModuleName}$3`);
             await outputFile(group.path, code, {encoding: 'utf8'});
         }));
     } catch (error) {
         console.error(error);
-        return false;
     } finally {
-        await Promise.all((cleanupFiles.map(async (file) => unlink(file))));
+        await Promise.all((cleanupFiles.map((file) => {
+            let stat = lstatSync(file);
+            if (stat.isDirectory()) {
+                emptyDirSync(file);
+                rmdirSync(file);
+            }
+            else unlinkSync(file);
+        })));
     }
-    return true;
 }

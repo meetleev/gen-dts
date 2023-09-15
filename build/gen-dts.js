@@ -17,6 +17,7 @@ const fs_extra_1 = require("fs-extra");
 const typescript_1 = __importDefault(require("typescript"));
 const tfig_1 = require("tfig");
 const path_1 = require("path");
+const fs_1 = require("fs");
 function getSourceEntries(engine) {
     return __awaiter(this, void 0, void 0, function* () {
         const result = {};
@@ -35,10 +36,22 @@ function getSourceEntries(engine) {
     });
 }
 function generate(options) {
-    var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         console.log(`Typescript version: ${typescript_1.default.version}`);
-        const { rootDir, outDir, rootModuleName, nonExportedThirdLibs } = options;
+        const { rootDir, output } = options;
+        if (Array.isArray(output)) {
+            for (let o of output)
+                yield _generate(rootDir, o);
+        }
+        else
+            yield _generate(rootDir, output);
+    });
+}
+exports.generate = generate;
+function _generate(rootDir, output) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        const { outDir, rootModuleName, nonExportedExternalLibs, usePathForRootModuleName, nonExportedSymbolDistribution, needCopyExternalTypes, } = output;
         (0, fs_extra_1.ensureDirSync)(outDir);
         const tsConfigPath = (0, path_1.join)(rootDir, 'tsconfig.json');
         const unbundledOutFile = (0, path_1.join)(outDir, `before-rollup.js`);
@@ -63,7 +76,7 @@ function generate(options) {
         const extName = (0, path_1.extname)(outputJSPath);
         if (extName !== '.js') {
             console.error(`Unexpected output extension ${extName}, please check it.`);
-            return undefined;
+            return;
         }
         const dirName = (0, path_1.dirname)(outputJSPath);
         const baseName = (0, path_1.basename)(outputJSPath, extName);
@@ -119,13 +132,16 @@ function generate(options) {
         // console.log('tscOutputDtsFile', tscOutputDtsFile)
         if (!(0, fs_extra_1.existsSync)(tscOutputDtsFile)) {
             console.error(`Failed to compile.`);
-            return false;
+            return;
         }
         const types = ((_b = (_a = parsedCommandLine.options) === null || _a === void 0 ? void 0 : _a.types) !== null && _b !== void 0 ? _b : []).map((typeFile) => `${typeFile}.d.ts`);
         console.log('types', types);
+        let cleanTypesPaths = [];
         types === null || types === void 0 ? void 0 : types.forEach((file) => {
             const destPath = (0, path_1.join)(outDir, (0, path_1.isAbsolute)(file) ? (0, path_1.basename)(file) : file);
-            (0, fs_extra_1.ensureDirSync)((0, path_1.dirname)(destPath));
+            let dir = (0, path_1.dirname)(destPath);
+            cleanTypesPaths.push(dir);
+            (0, fs_extra_1.ensureDirSync)(dir);
             (0, fs_extra_1.copyFileSync)(file, destPath);
         });
         const entryMap = yield getSourceEntries(rootDir);
@@ -139,35 +155,42 @@ function generate(options) {
         }))();
         console.log(`Bundling...`);
         let cleanupFiles = [tscOutputDtsFile, dtsFile];
+        if (!needCopyExternalTypes)
+            cleanupFiles = cleanupFiles.concat(cleanTypesPaths);
         try {
             const giftInputPath = tscOutputDtsFile;
             const giftOutputPath = (0, path_1.join)(dirName, `${rootModuleName}.d.ts`);
             const giftResult = (0, tfig_1.bundle)({
                 input: [giftInputPath, dtsFile],
-                /*name: 'cc',
-                rootModule: 'index',*/
                 entries: {
-                    'ccx': 'ccx',
+                    ccx: 'ccx',
                 },
                 groups: [
                     { test: /^ccx.*$/, path: giftOutputPath },
                 ],
-                nonExportedThirdLibs: nonExportedThirdLibs,
+                nonExportedExternalLibs: nonExportedExternalLibs,
+                nonExportedSymbolDistribution: nonExportedSymbolDistribution,
             });
             yield Promise.all(giftResult.groups.map((group) => __awaiter(this, void 0, void 0, function* () {
-                let code = group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1${rootModuleName}$3`);
+                let code = usePathForRootModuleName ? group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1'${rootModuleName}'$3`)
+                    : group.code.replace(/(module\s+)\"(.*)\"(\s+\{)/g, `$1${rootModuleName}$3`);
                 yield (0, fs_extra_1.outputFile)(group.path, code, { encoding: 'utf8' });
             })));
         }
         catch (error) {
             console.error(error);
-            return false;
         }
         finally {
-            yield Promise.all((cleanupFiles.map((file) => __awaiter(this, void 0, void 0, function* () { return (0, fs_extra_1.unlink)(file); }))));
+            yield Promise.all((cleanupFiles.map((file) => {
+                let stat = (0, fs_1.lstatSync)(file);
+                if (stat.isDirectory()) {
+                    (0, fs_extra_1.emptyDirSync)(file);
+                    (0, fs_1.rmdirSync)(file);
+                }
+                else
+                    (0, fs_extra_1.unlinkSync)(file);
+            })));
         }
-        return true;
     });
 }
-exports.generate = generate;
 //# sourceMappingURL=gen-dts.js.map

@@ -1,6 +1,6 @@
 {
   "name": "gen-dts",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "generate .d.ts bundle.",
   "main": "build/gen-dts.js",
   "types": "build/gen-dts.d.ts",
@@ -20,12 +20,12 @@
   "author": "Lee",
   "license": "ISC",
   "dependencies": {
-    "fs-extra": "^7.0.1",
-    "typescript": "^4.9.5",
-    "tfig": "git+https://github.com/meetleev/tfig.git"
+    "fs-extra": "^11.1.1",
+    "tfig": "github:meetleev/tfig#3.3.1",
+    "typescript": "^4.9.5"
   },
   "devDependencies": {
-    "@types/fs-extra": "^9.0.13",
-    "@types/node": "^12.0.0"
+    "@types/fs-extra": "^11.0.2",
+    "@types/node": "^18.17.1"
   }
 }
