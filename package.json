@@ -21,7 +21,7 @@
   "license": "ISC",
   "dependencies": {
     "fs-extra": "^11.1.1",
-    "tfig": "github:meetleev/tfig#3.3.1",
+    "tfig": "github:meetleev/tfig#f4b39805009282f019d200ab7792c2bba9b799fd",
     "typescript": "^4.9.5"
   },
   "devDependencies": {
